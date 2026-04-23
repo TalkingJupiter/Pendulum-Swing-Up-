@@ -79,8 +79,29 @@ def collect_data(size, env, agent, title="collecting"):
         buffer  — a populated Buffer
         avg_rwd — average per-step reward observed during the rollout
     """
-        
-    pass
+    buffer = Buffer(env.observation_space.shape[0], env.action_space.shape[0], size)
+
+    observation, info = env.reset()
+    done = False
+
+    for _ in range(size):
+        current_state = observation
+        action = act(agent, observation)
+        next_observation, reward, terminated, truncated, info = env.step(action)
+        if truncated or terminated:
+            done = True
+
+        buffer.add(current_state, action, reward, done)
+
+        if done:
+            observation, info = env.reset()
+            done = False
+        else:
+            observation = next_observation
+
+    
+    buffer.calc_reward_to_go()
+    return buffer, np.mean(buffer.rewards)
 
 
 def act(policy, state):
