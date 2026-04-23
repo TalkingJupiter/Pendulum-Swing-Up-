@@ -34,16 +34,16 @@ class Buffer:
         self.ep_len = ep_len
 
     def add(self, state, action, reward, done):
-        if self.i >= self.size: return
-        current_row = self.i
+        if self.i >= self.size: return #Check if we are oversize
+        current_row = self.i 
 
         self.states[current_row] = state
         self.actions[current_row] = action
         self.rewards[current_row] = reward
         self.dones[current_row] = done
 
-        self.i += 1
-        self.max_i += 1
+        self.i += 1 #Update the location
+        self.max_i += 1 
         
 
     def sample(self, batch_size):
@@ -63,7 +63,13 @@ class Buffer:
         )
 
     def calc_reward_to_go(self, gamma=0.975):
-        pass
+        reward_return = 0
+        for row in range(self.max_i-1, -1, -1):
+            if self.dones[row] == True:
+                reward_return = 0
+        
+            reward_return = self.rewards[row] + gamma * reward_return
+            self.ret_to_go[row] = reward_return
 
 
 def collect_data(size, env, agent, title="collecting"):
