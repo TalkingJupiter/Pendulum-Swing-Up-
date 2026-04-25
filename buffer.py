@@ -120,4 +120,4 @@ def act(policy, state):
 
 def rescale_actions(action, amin, amax):
     """Rescale a tanh-squashed action from (-1, 1) to the env range [amin, amax]."""
-    pass
+    return amin + 0.5 * (action + 1.0) * (amax - amin)
