@@ -47,14 +47,20 @@ def build_actor(state_dim, action_dim, hidden_size):
 
 def reinforce_signal(policy, states, actions, rewards_to_go, avg_rwd, use_avg=False):
     """Vanilla policy-gradient loss weighted by reward-to-go."""
-    # TODO: compute  -E[ (R_to_go - baseline?) * log pi(a | s) ]
-    pass
+    # Done: compute  -E[ (R_to_go - baseline?) * log pi(a | s) ]
+
+    if use_avg:
+        weight = rewards_to_go - avg_rwd
+    else:
+        weight =  rewards_to_go 
+
+    return -th.mean(weight * _log_prob(policy, states, actions))
 
 
 def reinforce_rwd_signal(policy, states, actions, rewards):
     """REINFORCE loss using one-step rewards instead of reward-to-go."""
-    # TODO: compute  -E[ r_t * log pi(a | s) ].
-    pass
+    # Done: compute  -E[ r_t * log pi(a | s) ].
+    return -th.mean(rewards * _log_prob(policy, states, actions))
 
 
 def train_vpg(
@@ -84,28 +90,50 @@ def train_vpg(
     optimizer = th.optim.Adam(params=policy.parameters(), lr=learning_rate)
 
     returns_per_epoch = []
+    size = episodes * episode_len
     for x in range(epochs):
-        # TODO: 1) roll out to fill a buffer (use collect_data under th.no_grad)
+        # Done: 1) roll out to fill a buffer (use collect_data under th.no_grad)
         #       2) buffer.calc_reward_to_go()
         with th.no_grad():
-            buffer, avg_rwd = None, None  # TODO
+            buffer, avg_rwd = collect_data(size, env, policy)
+            buffer.calc_reward_to_go(gamma)
 
         for i in range(updates):
             # TODO: You need to sample from the buffer here
+            sample = buffer.sample(batch_size)
+            states = sample[0]
+            actions = sample[1]
+            rewards = sample[2]
+            # next_states = sample[3]
+            # dones = sample[4]
+            rewards_to_go = sample[5]
+            # next_rewards_to_go = sample[6]
+
             # TODO: After sampling you need to convert numpy arrays to tensors, Example: "s_t = th.as_tensor(s, dtype=th.float32)"
-            
+            states = th.as_tensor(states, dtype=th.float32)
+            actions = th.as_tensor(actions,dtype=th.float32)
+            rewards = th.as_tensor(rewards,dtype=th.float32)
+            # next_states = th.as_tensor(next_states,dtype=th.float32)
+            # dones = th.as_tensor(dones,dtype=th.float32)
+            rewards_to_go = th.as_tensor(rewards_to_go,dtype=th.float32)
+            # next_rewards_to_go = th.as_tensor(next_rewards_to_go,dtype=th.float32)
+
             optimizer.zero_grad()
 
             # TODO: compute loss here
-            loss = 0.0
+            if use_rwds:
+                loss = reinforce_rwd_signal(policy, states, actions, rewards)
+            else:
+                loss = reinforce_signal(policy, states, actions, rewards_to_go, avg_rwd, use_avg) 
 
             loss.backward()
             optimizer.step()
 
         # TODO: record the epoch's avg episodic return for the learning curve.
+        returns_per_epoch.append(avg_rwd)
 
-    # TODO: return (policy, list_of_per_epoch_returns).
-
+    # Done: return (policy, list_of_per_epoch_returns).
+    return policy, returns_per_epoch
 
 if __name__ == "__main__":
     from plotting import plot_learning_curves
