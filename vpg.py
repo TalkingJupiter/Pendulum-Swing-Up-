@@ -90,46 +90,45 @@ def train_vpg(
     optimizer = th.optim.Adam(params=policy.parameters(), lr=learning_rate)
 
     returns_per_epoch = []
-    size = episodes * episode_len
     for x in range(epochs):
         # Done: 1) roll out to fill a buffer (use collect_data under th.no_grad)
         #       2) buffer.calc_reward_to_go()
         with th.no_grad():
-            buffer, avg_rwd = collect_data(size, env, policy)
+            buffer, avg_rwd = collect_data(episodes * episode_len, env, policy, title=f"vpg {x + 1}/{epochs}")
             buffer.calc_reward_to_go(gamma)
 
         for i in range(updates):
-            # TODO: You need to sample from the buffer here
-            sample = buffer.sample(batch_size)
-            states = sample[0]
-            actions = sample[1]
-            rewards = sample[2]
-            # next_states = sample[3]
-            # dones = sample[4]
-            rewards_to_go = sample[5]
-            # next_rewards_to_go = sample[6]
+            # Done: You need to sample from the buffer here
+            states, actions, rewards, _, _, rewards_to_go, _ = buffer.sample(batch_size)
+            # states = sample[0]
+            # actions = sample[1]
+            # rewards = sample[2]
+            # # next_states = sample[3]
+            # # dones = sample[4]
+            # rewards_to_go = sample[5]
+            # # next_rewards_to_go = sample[6]
 
-            # TODO: After sampling you need to convert numpy arrays to tensors, Example: "s_t = th.as_tensor(s, dtype=th.float32)"
-            states = th.as_tensor(states, dtype=th.float32)
-            actions = th.as_tensor(actions,dtype=th.float32)
-            rewards = th.as_tensor(rewards,dtype=th.float32)
+            # Done: After sampling you need to convert numpy arrays to tensors, Example: "s_t = th.as_tensor(s, dtype=th.float32)"
+            states_t = th.as_tensor(states, dtype=th.float32)
+            actions_t = th.as_tensor(actions,dtype=th.float32)
+            rewards_t = th.as_tensor(rewards,dtype=th.float32)
             # next_states = th.as_tensor(next_states,dtype=th.float32)
             # dones = th.as_tensor(dones,dtype=th.float32)
-            rewards_to_go = th.as_tensor(rewards_to_go,dtype=th.float32)
+            rewards_to_go_t = th.as_tensor(rewards_to_go,dtype=th.float32)
             # next_rewards_to_go = th.as_tensor(next_rewards_to_go,dtype=th.float32)
 
             optimizer.zero_grad()
 
-            # TODO: compute loss here
+            # Done: compute loss here
             if use_rwds:
-                loss = reinforce_rwd_signal(policy, states, actions, rewards)
+                loss = reinforce_rwd_signal(policy, states_t, actions_t, rewards_t)
             else:
-                loss = reinforce_signal(policy, states, actions, rewards_to_go, avg_rwd, use_avg) 
+                loss = reinforce_signal(policy, states_t, actions_t, rewards_to_go_t, avg_rwd, use_avg) 
 
             loss.backward()
             optimizer.step()
 
-        # TODO: record the epoch's avg episodic return for the learning curve.
+        # Done: record the epoch's avg episodic return for the learning curve.
         returns_per_epoch.append(avg_rwd)
 
     # Done: return (policy, list_of_per_epoch_returns).
