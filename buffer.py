@@ -62,7 +62,7 @@ class Buffer:
             self.ret_to_go[next_idxs],
         )
 
-    def calc_reward_to_go(self, gamma=0.975):
+    def calc_reward_to_go(self, gamma):
         reward_return = 0
         for row in range(self.max_i-1, -1, -1):
             if self.dones[row] == True:
@@ -100,7 +100,7 @@ def collect_data(size, env, agent, title="collecting"):
             observation = next_observation
 
     
-    buffer.calc_reward_to_go()
+    # buffer.calc_reward_to_go()
     return buffer, np.mean(buffer.rewards)
 
 
