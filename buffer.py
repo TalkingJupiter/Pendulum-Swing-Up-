@@ -106,7 +106,16 @@ def collect_data(size, env, agent, title="collecting"):
 
 def act(policy, state):
     """Sample a continuous action a ~ N(mu(state), sigma) from the policy."""
-    pass
+    state = th.from_numpy(state).float() #convert np.array to pytorch tensors
+    mu, sigma = policy(state) #Receive mu, sigma values from policy
+
+    distribution = Normal(mu, sigma) #Gather the normalized distribution
+    
+    action = distribution.sample() #Sample from the distribution object
+    action = action.detach().numpy() #Stoping the tensor track to convert tensors to numpy array
+    
+    return action
+ 
 
 
 def rescale_actions(action, amin, amax):
