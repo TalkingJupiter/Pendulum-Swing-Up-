@@ -121,3 +121,71 @@ def act(policy, state):
 def rescale_actions(action, amin, amax):
     """Rescale a tanh-squashed action from (-1, 1) to the env range [amin, amax]."""
     return amin + 0.5 * (action + 1.0) * (amax - amin)
+
+# -------------------
+# PROJECT EXTENSION 3
+# -------------------
+def act_batch(policy, state):
+    state_t = th.as_tensor(state, dtype=th.float32)
+
+    mu, sigma = policy(state_t)
+    dist = Normal(mu, sigma)
+
+    actions = dist.sample()
+    actions = actions.detach().numpy()
+    return actions
+
+
+def collect_parallel(size, agent, num_envs=4, title="collecting parallel"):
+    envs = gym.vector.SyncVectorEnv([
+        lambda: gym.make("Pendulum-v1")
+        for _ in range(num_envs)
+        ])
+    
+    sdim = envs.single_observation_space.shape[0]
+    adim = envs.single_action_space.shape[0]
+
+    num_steps = int(np.ceil(size/num_envs))
+
+    traj =[]
+    for i in range(num_envs):
+        traj.append({
+            "states": [],
+            "actions": [],
+            "rewards": [],
+            "dones": []
+        })
+    
+    observ, infos = envs.reset()
+    for i in range(num_steps):
+        current_states = observ.copy()
+        actions = act_batch(agent, current_states)
+        next_observ, rewards, terminated, truncated, infos = envs.step(actions)
+
+        dones = np.logical_or(terminated, truncated)
+
+        for idx in range(num_envs):
+            traj[idx]["states"].append(current_states[idx].copy())
+            traj[idx]["actions"].append(actions[idx].copy())
+            traj[idx]["rewards"].append(rewards[idx].copy())
+            traj[idx]["dones"].append(dones[idx].copy())
+
+        observ = next_observ
+    envs.close()
+
+    buffer = Buffer(sdim, adim, num_steps * num_envs)
+
+    for idx in range(num_envs):
+        traj[idx]["dones"][-1] = True #prevents adv calc from leaking into next env traj
+
+        for t in range(num_steps):
+            buffer.add(
+                traj[idx]["states"][t],
+                traj[idx]["actions"][t],
+                traj[idx]["rewards"][t],
+                traj[idx]["dones"][t],            
+            )
+    
+    awg_rwd = np.mean(buffer.rewards[:buffer.max_i])
+
+    return buffer, awg_rwd

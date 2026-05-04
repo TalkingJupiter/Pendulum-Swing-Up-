@@ -10,9 +10,10 @@ from torch.nn.functional import mse_loss
 from torch.distributions import Normal
 import gymnasium as gym
 
-from buffer import Buffer, collect_data, act, rescale_actions
+from buffer import Buffer, collect_data, act, rescale_actions, collect_parallel
 from vpg import _log_prob, build_actor, build_actor_state_dep
 from gae import build_critic, compute_gae, build_ensamble
+import time
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +114,8 @@ def train_ppo(
     clip=True,
     state_dep_std= False,
     ensamble_crit = False,
-    num_crit = 3
+    num_crit = 3,
+    num_envs=1
 ):
     """Full PPO algorithm with a single actor (N = 1).
 
@@ -145,8 +147,13 @@ def train_ppo(
     for k in range(iterations):
         # Done: 1) roll out the current policy for `steps_per_iter` steps
         #          and store transitions in a Buffer.
+        collect_start = time.perf_counter()
         with th.no_grad():
-            buffer, avg_rwd = collect_data(steps_per_iter, env, policy)
+            if num_envs==1:
+                buffer, avg_rwd = collect_data(steps_per_iter, env, policy)
+            else:
+                buffer, avg_rwd = collect_parallel(steps_per_iter, policy, num_envs=num_envs)
+        collect_time = time.perf_counter() - collect_start
         #       2) compute V(s) and V(s') with the critic, then GAE advantages
         #          and target returns (returns = advantages + V(s)).
         all_states = buffer.states[:buffer.max_i]
@@ -185,6 +192,7 @@ def train_ppo(
 
         #       4) for `sgd_epochs` epochs, iterate over minibatches of the
         #          collected data and minimise ppo_total_loss(...).
+        update_start = time.perf_counter()
         losses = []
         for epochs in range(sgd_epochs):
             idxs = np.random.permutation(buffer.max_i)
@@ -211,11 +219,20 @@ def train_ppo(
 
                 losses.append(loss.item())
         losses_per_iter.append(float(np.mean(losses)))
+        update_time = time.perf_counter() - update_start
                 
         #       5) log per-iteration episodic return and total loss for the
         #          required learning / loss curve plots.
         ep_return = avg_rwd * episode_len
         returns_per_iter.append(ep_return)
+
+        print(
+            f"iter {k + 1}/{iterations} | "
+            f"envs={num_envs} | "
+            f"return={ep_return:.2f} | "
+            f"collect={collect_time:.4f}s | "
+            f"update={update_time:.4f}s"
+        )
 
     # Done: return policy, list_of_returns, list_of_losses
     return policy, returns_per_iter, losses_per_iter
