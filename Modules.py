@@ -44,3 +44,39 @@ class StateDependentNormalModule(nn.Module):
         sigma = torch.exp(log_std)
 
         return mu, sigma
+
+class RecurrentActor(nn.Module):
+    def __init__(self, obs_dim, action_dim, hidden_size):
+        super().__init__()
+
+        self.hidden_size = hidden_size
+        self.gru = nn.GRUCell(obs_dim, hidden_size)
+        self.mean_layer = nn.Linear(hidden_size, action_dim)
+        self.log_std = nn.Parameter(torch.ones(action_dim) * -0.5) # Fixed log std for this extension
+
+    def forward(self, obs, hidden=None):
+        single_input = False
+
+        if obs.dim() == 1:
+            obs = obs.unsqueeze(0)
+            single_input = True
+
+        batch_size = obs.shape[0]
+
+        if hidden is None:
+            hidden = torch.zeros(batch_size, self.hidden_size, device=obs.device)
+
+        if hidden.dim() == 1:
+            hidden = hidden.unsqueeze(0)
+
+        next_hidden = self.gru(obs, hidden)
+
+        mu = torch.tanh(self.mean_layer(next_hidden))
+        sigma = torch.exp(self.log_std).expand_as(mu)
+
+        if single_input:
+            mu = mu.squeeze(0)
+            sigma = sigma.squeeze(0)
+            next_hidden = next_hidden.squeeze(0)
+
+        return mu, sigma, next_hidden
