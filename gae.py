@@ -161,8 +161,8 @@ if __name__ == "__main__":
     from vpg import train_vpg
 
     # Example: compare rewards-to-go vs GAE
-    policy_rtg, ret_rtg = train_vpg(epochs=200, learning_rate=3e-4)
-    policy_gae, ret_gae = train_advantage_vpg(epochs=200, learning_rate=3e-4)
+    policy_rtg, ret_rtg = train_vpg(epochs=200, learning_rate=1e-2)
+    policy_gae, ret_gae = train_advantage_vpg(epochs=200, learning_rate=1e-2)
     plot_learning_curves(
         {"rewards-to-go": ret_rtg, "GAE": ret_gae},
         title="Task 3: rewards-to-go vs GAE",

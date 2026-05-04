@@ -140,9 +140,10 @@ if __name__ == "__main__":
 
     # Example: compare two learning rates
     policy_lo, ret_lo = train_vpg(epochs=200, learning_rate=1e-4)
+    policy_lo, ret_mid = train_vpg(epochs=200, learning_rate=1e-5) 
     policy_hi, ret_hi = train_vpg(epochs=200, learning_rate=3e-4)
     plot_learning_curves(
-        {"lr=1e-4": ret_lo, "lr=3e-4": ret_hi},
-        title="Task 2: VPG with different learning rates",
+        {"lr=1e-4": ret_lo,"lr=1e-5":ret_mid ,"lr=3e-4": ret_hi},
+        title="Task 2: VPG with different learning rates (200)",
     )
     record_video(policy_hi, path="videos/task2_vpg.mp4")  # optional
