@@ -35,6 +35,42 @@ def build_critic(state_dim, hidden_size):
         nn.Linear(hidden_size, 1),
     )
 
+# -------------------
+# PROJECT EXTENSTION 2
+# -------------------
+class EnsambleCritic(nn.Module):
+    def __init__(self, state_dim, hidden_size, num_critic=3):
+        super().__init__()
+
+        self.critics = nn.ModuleList([
+            build_critic(state_dim, hidden_size)
+            for _ in range(num_critic)])
+        
+    def forward(self, states):
+        value = []
+
+        for critic in self.critics:
+            value.append(critic(states))
+
+        value = th.stack(value, dim=0)
+        return value.mean(dim=0)
+    
+    def value_loss(self, states, returns):
+        losses = []
+        for critic in self.critics:
+            pred = critic(states)
+            target = returns.view_as(pred) #returns has same shape as prediction
+            loss = mse_loss(pred, target) #returns a SCALAR because mse_loss default reduction is "mean"
+
+            losses.append(loss)
+
+        
+        losses = th.stack(losses)
+        return losses.mean()
+        
+def build_ensamble(state_dim, hidden_size, num_crit=3):
+    return EnsambleCritic(state_dim, hidden_size, num_crit)
+
 
 # ---------------------------------------------------------------------------
 # Task 3 TODOs

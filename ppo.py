@@ -12,7 +12,7 @@ import gymnasium as gym
 
 from buffer import Buffer, collect_data, act, rescale_actions
 from vpg import _log_prob, build_actor, build_actor_state_dep
-from gae import build_critic, compute_gae
+from gae import build_critic, compute_gae, build_ensamble
 
 
 # ---------------------------------------------------------------------------
@@ -82,13 +82,16 @@ def ppo_total_loss(
     where L_VF = ( V_theta(s) - R_t )^2  and  S[pi] is the policy entropy.
     Returns a scalar tensor to be minimised.
     """
-    l_vf = mse_loss(critic(states), returns)
+    if hasattr(critic, "value_loss"):
+        l_vf = critic.value_loss(states, returns)
+    else:
+        l_vf = mse_loss(critic(states), returns)
     
     mu, sigma = policy(states)
     dist = Normal(mu, sigma)
     entropy = dist.entropy().sum(dim=-1, keepdim=True).mean()
 
-    return ppo_surrogate_loss(policy, states, actions, advantages, old_log_probs,eps_clip, clip) + c1 * l_vf - c2 * entropy
+    return (ppo_surrogate_loss(policy, states, actions, advantages, old_log_probs,eps_clip, clip) + c1 * l_vf - c2 * entropy).mean()
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +111,9 @@ def train_ppo(
     c1=0.5,
     c2=0.01,
     clip=True,
-    state_dep_std= False
+    state_dep_std= False,
+    ensamble_crit = False,
+    num_crit = 3
 ):
     """Full PPO algorithm with a single actor (N = 1).
 
@@ -121,11 +126,16 @@ def train_ppo(
     state_dim  = env.reset()[0].shape[0]
     action_dim = env.action_space.sample().shape[0]
     episode_len = env.spec.max_episode_steps
+
     if state_dep_std:
         policy = build_actor_state_dep(state_dim, action_dim, hidden_size)
     else:
         policy       = build_actor(state_dim, action_dim, hidden_size)
-    critic       = build_critic(state_dim, hidden_size)
+
+    if ensamble_crit:
+        critic = build_ensamble(state_dim, hidden_size, num_crit)
+    else:
+        critic       = build_critic(state_dim, hidden_size)
     optimizer    = th.optim.Adam(policy.parameters(), lr=learning_rate)
     cr_optimizer = th.optim.Adam(critic.parameters(), lr=learning_rate)
 
