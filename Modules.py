@@ -25,3 +25,22 @@ class NormalModule(nn.Module):
         vout = torch.exp(self.log_std)
         # mu is squashed to (-1, 1); rescale it to the env action range later.
         return F.tanh(mout), vout
+    
+
+class StateDependentNormalModule(nn.Module):
+    def __init__(self, inp, out):
+        super().__init__()
+        self.m = nn.Linear(inp, out)
+        self.std_layer = nn.Linear(inp, out)
+
+        nn.init.constant_(self.std_layer.weight, 0.0)
+        nn.init.constant_(self.std_layer.bias, -0.5)
+    
+    def forward(self, inputs):
+        mu = torch.tanh(self.m(inputs))
+        log_std = self.std_layer(inputs)
+        log_std = torch.clamp(log_std, -5.0, 2.0)
+
+        sigma = torch.exp(log_std)
+
+        return mu, sigma

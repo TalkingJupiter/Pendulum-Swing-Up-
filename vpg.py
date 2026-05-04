@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch.distributions import Normal
 import gymnasium as gym
 
-from Modules import NormalModule
+from Modules import NormalModule, StateDependentNormalModule
 from buffer import Buffer, collect_data, act, rescale_actions
 
 
@@ -133,6 +133,18 @@ def train_vpg(
 
     # Done: return (policy, list_of_per_epoch_returns).
     return policy, returns_per_epoch
+
+# ------------------
+# PROJECT EXTENSTION 
+# ------------------
+def build_actor_state_dep(state_dim, action_dim, hidden_size):
+    return nn.Sequential(
+        nn.Linear(state_dim, hidden_size),
+        nn.ReLU(),
+        nn.Linear(hidden_size, hidden_size),
+        StateDependentNormalModule(hidden_size, action_dim)
+    )
+
 
 if __name__ == "__main__":
     from plotting import plot_learning_curves

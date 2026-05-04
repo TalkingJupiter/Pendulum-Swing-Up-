@@ -11,7 +11,7 @@ from torch.distributions import Normal
 import gymnasium as gym
 
 from buffer import Buffer, collect_data, act, rescale_actions
-from vpg import _log_prob, build_actor
+from vpg import _log_prob, build_actor, build_actor_state_dep
 from gae import build_critic, compute_gae
 
 
@@ -108,6 +108,7 @@ def train_ppo(
     c1=0.5,
     c2=0.01,
     clip=True,
+    state_dep_std= False
 ):
     """Full PPO algorithm with a single actor (N = 1).
 
@@ -120,8 +121,10 @@ def train_ppo(
     state_dim  = env.reset()[0].shape[0]
     action_dim = env.action_space.sample().shape[0]
     episode_len = env.spec.max_episode_steps
-
-    policy       = build_actor(state_dim, action_dim, hidden_size)
+    if state_dep_std:
+        policy = build_actor_state_dep(state_dim, action_dim, hidden_size)
+    else:
+        policy       = build_actor(state_dim, action_dim, hidden_size)
     critic       = build_critic(state_dim, hidden_size)
     optimizer    = th.optim.Adam(policy.parameters(), lr=learning_rate)
     cr_optimizer = th.optim.Adam(critic.parameters(), lr=learning_rate)
