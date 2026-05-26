@@ -28,18 +28,20 @@ class Buffer:
         self.rewards   = np.zeros((size, 1),    dtype=np.float32)
         self.ret_to_go = np.zeros((size, 1),    dtype=np.float32)
         self.dones     = np.zeros((size, 1),    dtype=bool)
+        self.next_states = np.zeros((size, sdim), dtype=sdtype)
         self.i     = 0
         self.size  = size
         self.max_i = 0
         self.ep_len = ep_len
 
-    def add(self, state, action, reward, done):
+    def add(self, state, action, reward, next_states, done):
         if self.i >= self.size: return #Check if we are oversize
         current_row = self.i 
 
         self.states[current_row] = state
         self.actions[current_row] = action
         self.rewards[current_row] = reward
+        self.next_states[current_row] = next_states
         self.dones[current_row] = done
 
         self.i += 1 #Update the location
@@ -47,19 +49,14 @@ class Buffer:
         
 
     def sample(self, batch_size):
-        upper = max(self.max_i - 1, 1)
-        idxs = np.random.randint(0, upper, size=batch_size)
-        done_mask = self.dones[idxs, 0]
-        idxs = np.where(done_mask, np.maximum(idxs - 1, 0), idxs)
-        next_idxs = idxs + 1
+        idxs = np.random.randint(0, self.max_i, size=batch_size)
         return (
             self.states[idxs],
             self.actions[idxs],
             self.rewards[idxs],
-            self.states[next_idxs],
-            self.dones[next_idxs],
+            self.next_states[idxs],
+            self.dones[idxs],
             self.ret_to_go[idxs],
-            self.ret_to_go[next_idxs],
         )
 
     def calc_reward_to_go(self, gamma):
@@ -92,7 +89,7 @@ def collect_data(size, env, agent, title="collecting"):
         if truncated or terminated:
             done = True
 
-        buffer.add(current_state, env_action, reward, done)
+        buffer.add(current_state, raw_action, reward, next_observation, done)
 
         if done:
             observation, info = env.reset()
@@ -154,21 +151,28 @@ def collect_parallel(size, agent, num_envs=4, title="collecting parallel"):
             "states": [],
             "actions": [],
             "rewards": [],
+            "next_states": [],
             "dones": []
         })
     
     observ, infos = envs.reset()
     for i in range(num_steps):
         current_states = observ.copy()
-        actions = act_batch(agent, current_states)
-        next_observ, rewards, terminated, truncated, infos = envs.step(actions)
+        raw_actions = act_batch(agent, current_states)
+        env_actions = np.clip(
+            rescale_actions(raw_actions, envs.single_action_space.low, envs.single_action_space.high),
+            envs.single_action_space.low,
+            envs.single_action_space.high,
+        )
+        next_observ, rewards, terminated, truncated, infos = envs.step(env_actions)
 
         dones = np.logical_or(terminated, truncated)
 
         for idx in range(num_envs):
             traj[idx]["states"].append(current_states[idx].copy())
-            traj[idx]["actions"].append(actions[idx].copy())
+            traj[idx]["actions"].append(raw_actions[idx].copy())
             traj[idx]["rewards"].append(rewards[idx].copy())
+            traj[idx]["next_states"].append(next_observ[idx].copy())
             traj[idx]["dones"].append(dones[idx].copy())
 
         observ = next_observ
@@ -184,6 +188,7 @@ def collect_parallel(size, agent, num_envs=4, title="collecting parallel"):
                 traj[idx]["states"][t],
                 traj[idx]["actions"][t],
                 traj[idx]["rewards"][t],
+                traj[idx]["next_states"][t],
                 traj[idx]["dones"][t],            
             )
     
