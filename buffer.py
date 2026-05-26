@@ -9,6 +9,7 @@ import torch as th
 import torch.nn as nn
 from torch.distributions import Normal
 import gymnasium as gym
+from gymnasium.spaces import Box
 
 from Modules import NormalModule
 
@@ -143,6 +144,9 @@ def collect_parallel(size, agent, num_envs=4, title="collecting parallel"):
     sdim = envs.single_observation_space.shape[0]
     adim = envs.single_action_space.shape[0]
 
+    action_space = envs.single_action_space
+    assert isinstance(action_space, Box)
+
     num_steps = int(np.ceil(size/num_envs))
 
     traj =[]
@@ -160,9 +164,9 @@ def collect_parallel(size, agent, num_envs=4, title="collecting parallel"):
         current_states = observ.copy()
         raw_actions = act_batch(agent, current_states)
         env_actions = np.clip(
-            rescale_actions(raw_actions, envs.single_action_space.low, envs.single_action_space.high),
-            envs.single_action_space.low,
-            envs.single_action_space.high,
+            rescale_actions(raw_actions, action_space.low, action_space.high),
+            action_space.low,
+            action_space.high,
         )
         next_observ, rewards, terminated, truncated, infos = envs.step(env_actions)
 
