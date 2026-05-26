@@ -99,7 +99,7 @@ def train_vpg(
 
         for i in range(updates):
             # Done: You need to sample from the buffer here
-            states, actions, rewards, _, _, rewards_to_go, _ = buffer.sample(batch_size)
+            states, actions, rewards, _, _, rewards_to_go = buffer.sample(batch_size)
             # states = sample[0]
             # actions = sample[1]
             # rewards = sample[2]
