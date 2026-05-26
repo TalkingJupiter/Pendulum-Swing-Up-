@@ -86,12 +86,13 @@ def collect_data(size, env, agent, title="collecting"):
 
     for _ in range(size):
         current_state = observation
-        action = act(agent, observation)
-        next_observation, reward, terminated, truncated, info = env.step(action)
+        raw_action = act(agent, observation)
+        env_action = np.clip(rescale_actions(raw_action, env.action_space.low, env.action_space.high), env.action_space.low, env.action_space.high)
+        next_observation, reward, terminated, truncated, info = env.step(env_action)
         if truncated or terminated:
             done = True
 
-        buffer.add(current_state, action, reward, done)
+        buffer.add(current_state, env_action, reward, done)
 
         if done:
             observation, info = env.reset()
